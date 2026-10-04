@@ -58,7 +58,7 @@ export default function RailwayHome() {
       </header>
 
       {/* Search Form (Overlapping the hero) */}
-      <main className="flex-grow -mt-24 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 z-10 relative">
+      <main className="grow -mt-24 max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 z-10 relative">
         <div className="bg-white rounded-xl shadow-xl p-6 md:p-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
             <Search className="mr-2 h-6 w-6 text-blue-600" />
