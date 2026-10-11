@@ -1,13 +1,19 @@
-import { configureStore } from "@reduxjs/toolkit";
+import { configureStore, combineReducers } from "@reduxjs/toolkit";
+import authReducer from "./slices/authSlice";
+import uiReducer from "./slices/uiSlice";
 
-export const makeStore = () => {
-  return configureStore({
-    reducer: {
-      // your reducers will go here
-    },
+const rootReducer = combineReducers({
+  auth: authReducer,
+  ui: uiReducer,
+});
+
+export type RootState = ReturnType<typeof rootReducer>;
+
+export const makeStore = (preloadedState?: Partial<RootState>) =>
+  configureStore({
+    reducer: rootReducer,
+    preloadedState,
   });
-};
 
 export type AppStore = ReturnType<typeof makeStore>;
-export type RootState = ReturnType<AppStore["getState"]>;
 export type AppDispatch = AppStore["dispatch"];

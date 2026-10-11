@@ -1,0 +1,27 @@
+export const DEFAULT_LOCALE = "en";
+export const SUPPORTED_LOCALES = [
+  "as",
+  "bn",
+  "brx",
+  "doi",
+  "en",
+  "gu",
+  "hi",
+  "kn",
+  "kok",
+  "ks",
+  "mai",
+  "ml",
+  "mni",
+  "mr",
+  "ne",
+  "or",
+  "pa",
+  "sa",
+  "sat",
+  "sd",
+  "ta",
+  "te",
+  "ur",
+] as const;
+

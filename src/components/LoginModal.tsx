@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
-import { ArrowLeft, ArrowRight, KeyRound, Loader2, Mail, ShieldCheck, TrainFront, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, KeyRound, Loader2, Mail, ShieldCheck, TramFront, X } from "lucide-react";
 
 /**
  * RailGo login modal (email OTP).
  * Adjust the two endpoint paths + response shape to match your Spring Boot controllers.
  */
-const SEND_OTP_URL = "/api/public/send-email-login-otp";
-const VERIFY_OTP_URL = "/api/public/verify-email-login-otp";
+const SEND_OTP_URL = "/api/auth/send_email_login_otp";
+const VERIFY_OTP_URL = "/api/auth/verify_email_login_otp";
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 30;
 
@@ -148,7 +148,7 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
             <X className="h-5 w-5" />
           </button>
           <div className="mb-4 flex items-center gap-2">
-            <TrainFront className="h-7 w-7" />
+            <TramFront className="h-7 w-7" />
             <span className="text-xl font-bold">RailGo</span>
           </div>
           <h2 id="login-title" className="text-2xl font-bold">
