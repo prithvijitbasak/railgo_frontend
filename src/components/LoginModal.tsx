@@ -1,7 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
-import { ArrowLeft, ArrowRight, KeyRound, Loader2, Mail, ShieldCheck, TramFront, X } from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type KeyboardEvent,
+} from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  KeyRound,
+  Loader2,
+  Mail,
+  ShieldCheck,
+  TramFront,
+  X,
+} from "lucide-react";
+import { clientFetch } from "@/lib/authFetch";
 
 /**
  * RailGo login modal (email OTP).
@@ -42,7 +58,8 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
     }
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKey = (e: globalThis.KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: globalThis.KeyboardEvent) =>
+      e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     emailRef.current?.focus();
     return () => {
@@ -66,17 +83,24 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch(SEND_OTP_URL, {
+      const formData = new FormData();
+      formData.append("email", email);
+
+      const res = await clientFetch(SEND_OTP_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: formData,
       });
-      if (!res.ok) throw new Error("Could not send the code. Check your email and try again.");
+      if (!res.ok)
+        throw new Error(
+          "Could not send the code. Check your email and try again.",
+        );
       setStep("otp");
       setCooldown(RESEND_SECONDS);
       setTimeout(() => otpRefs.current[0]?.focus(), 0);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      setError(
+        e instanceof Error ? e.message : "Something went wrong. Try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -86,18 +110,23 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch(VERIFY_OTP_URL, {
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("otp", code);
+
+      const { ok, data } = await clientFetch(VERIFY_OTP_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp: code }),
+        body: formData,
       });
-      if (!res.ok) throw new Error("That code is incorrect or expired.");
-      const data = await res.json();
+      if (!ok) throw new Error("That code is incorrect or expired.");
+
       const token: string = data.token ?? data.accessToken ?? data.access_token;
       onSuccess?.(token);
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
+      setError(
+        e instanceof Error ? e.message : "Something went wrong. Try again.",
+      );
       setOtp(Array(OTP_LENGTH).fill(""));
       otpRefs.current[0]?.focus();
     } finally {
@@ -115,11 +144,15 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
   }
 
   function onOtpKeyDown(i: number, e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Backspace" && !otp[i] && i > 0) otpRefs.current[i - 1]?.focus();
+    if (e.key === "Backspace" && !otp[i] && i > 0)
+      otpRefs.current[i - 1]?.focus();
   }
 
   function onOtpPaste(e: ClipboardEvent<HTMLInputElement>) {
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, OTP_LENGTH);
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, OTP_LENGTH);
     if (!pasted) return;
     e.preventDefault();
     const next = Array(OTP_LENGTH).fill("");
@@ -143,7 +176,7 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="absolute right-4 top-4 rounded-lg p-1.5 text-white/80 transition hover:bg-white/15 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            className="absolute cursor-pointer right-4 top-4 rounded-lg p-1.5 text-white/80 transition hover:bg-white/15 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -169,7 +202,10 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
                 if (validEmail && !loading) sendOtp();
               }}
             >
-              <label htmlFor="login-email" className="mb-1.5 block text-sm font-semibold text-slate-700">
+              <label
+                htmlFor="login-email"
+                className="mb-1.5 block text-sm font-semibold text-slate-700"
+              >
                 Email address
               </label>
               <div className="relative">
@@ -191,14 +227,23 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
               <button
                 type="submit"
                 disabled={!validEmail || loading}
-                className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-orange-500 font-semibold text-white transition hover:bg-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-orange-500 font-semibold text-white transition hover:bg-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <>Send code <ArrowRight className="h-5 w-5" /></>}
+                {loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <>
+                    Send code <ArrowRight className="h-5 w-5" />
+                  </>
+                )}
               </button>
             </form>
           ) : (
             <div>
-              <div className="flex justify-between gap-2" aria-label="One-time code">
+              <div
+                className="flex justify-between gap-2"
+                aria-label="One-time code"
+              >
                 {otp.map((d, i) => (
                   <input
                     key={i}
@@ -224,9 +269,15 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
               <button
                 onClick={() => verifyOtp(otp.join(""))}
                 disabled={otp.some((d) => !d) || loading}
-                className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-orange-500 font-semibold text-white transition hover:bg-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-orange-500 font-semibold text-white transition hover:bg-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><KeyRound className="h-5 w-5" /> Verify and log in</>}
+                {loading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <>
+                    <KeyRound className="h-5 w-5" /> Verify and log in
+                  </>
+                )}
               </button>
 
               <div className="mt-4 flex items-center justify-between text-sm">

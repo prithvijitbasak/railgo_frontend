@@ -12,6 +12,8 @@ export default async function Page() {
   const response = await ssrFetch("/api/public/ssr/home", existingToken);
   const token = response.refreshedToken ?? existingToken ?? null;
 
+  console.log("Showing from home ssr",response.data);
+
   return (
     <HomeStoreProvider
       authState={{

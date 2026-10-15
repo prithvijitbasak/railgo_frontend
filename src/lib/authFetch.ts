@@ -23,19 +23,29 @@ async function parseBody(response: Response) {
   }
 }
 
-export async function clientFetch(path: string, options: RequestInit = {}) {
-  const token = getClientTokenCookie();
+export async function clientFetch(url: string, options: RequestInit = {}) {
+  const headers = new Headers(options.headers);
 
-  const response = await fetch(`${CLIENT_BASE}${path}`, {
+  const isFormData = options.body instanceof FormData;
+
+  // Let the browser set multipart/form-data + boundary for FormData
+  if (!isFormData && options.body && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const token = getClientTokenCookie();
+  if (token) headers.set("access_token", token);
+
+  const response = await fetch(url, {
     ...options,
-    headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { access_token: token } : {}),
-      ...(options.headers as Record<string, string> | undefined),
-    },
+    headers,
+    body:
+      isFormData || typeof options.body === "string" || !options.body
+        ? options.body
+        : JSON.stringify(options.body),   // plain objects only
   });
 
-  const data = await parseBody(response);
+  const data = await response.json().catch(() => null);
   return { response, data, ok: response.ok };
 }
 
