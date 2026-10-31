@@ -5,6 +5,7 @@ import { Menu, TramFront, X } from "lucide-react";
 import { BRAND } from "@/lib/constants";
 import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { setLoginModalOpen } from "@/redux/slices/uiSlice";
+import { setCredentials, type AuthUser } from "@/redux/slices/authSlice";
 import Link from "next/link";
 import LoginModal from "@/components/LoginModal";
 import { useRouter } from "next/navigation";
@@ -27,11 +28,6 @@ export default function Header() {
     [dispatch]
   );
 
-  const handleLoginSuccess = (token: string) => {
-    // store the new user token here (cookie / auth slice), then reload SSR data
-    router.refresh();
-  };
-
   const openLogin = () => {
     setMenuOpen(false);
     dispatch(setLoginModalOpen(true));
@@ -39,7 +35,7 @@ export default function Header() {
 
   const authBlock = user ? (
     <span className="text-sm font-medium truncate max-w-[16rem]">
-      {user.email}
+      Hi, {user.first_name}
     </span>
   ) : (
     <button
@@ -123,7 +119,7 @@ export default function Header() {
             <div className="px-4 pb-4 pt-2 border-t border-blue-600">
               {user ? (
                 <span className="block px-3 text-sm font-medium truncate">
-                  {user.email}
+                  Hi, {user.first_name}
                 </span>
               ) : (
                 <button
@@ -141,7 +137,6 @@ export default function Header() {
       <LoginModal
         open={loginModalOpen}
         onClose={closeLogin}
-        onSuccess={handleLoginSuccess}
       />
     </>
   );

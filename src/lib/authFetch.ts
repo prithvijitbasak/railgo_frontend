@@ -23,6 +23,27 @@ async function parseBody(response: Response) {
   }
 }
 
+export function handleAuthAction(
+  data: { action?: string; token?: string } | null | undefined, 
+  response: { headers?: { get?: (name: string) => string | null } } | null | undefined, 
+  options: { currentToken?: string | null } = {}
+) {
+  const { currentToken = null } = options;
+  const action = data?.action;
+  
+  const headerToken =
+    typeof response?.headers?.get === "function" 
+      ? response.headers.get("token")
+      : null;
+
+  const newToken = data?.token || headerToken;
+ 
+  if (newToken && newToken !== currentToken) {
+    setClientTokenCookie(newToken);
+  }
+}
+
+
 export async function clientFetch(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers);
 
@@ -45,11 +66,23 @@ export async function clientFetch(url: string, options: RequestInit = {}) {
         : JSON.stringify(options.body),   // plain objects only
   });
 
+  const currentTokenValue = response?.headers?.get("token");
+  console.log("new token is: ", currentTokenValue);
+
   const data = await response.json().catch(() => null);
-  return { response, data, ok: response.ok };
+  const existingToken=getClientTokenCookie();
+  if(currentTokenValue && existingToken !== currentTokenValue){
+    setClientTokenCookie(currentTokenValue);
+    console.log("saved currentToken: ", currentTokenValue);
+  }
+  // handleAuthAction(data, response, { currentToken: currentTokenValue });
+
+  return { response, data, ok: response.ok, headers: response?.headers };
 }
 
 export async function ssrFetch(path: string, token: string | null, extraHeaders: Record<string, string> = {}) {
+  console.log("path: ", path);
+  console.log("token: ", token);
   try {
     const response = await fetch(`${SSR_BASE}${path}`, {
       cache: "no-store",
@@ -65,13 +98,25 @@ export async function ssrFetch(path: string, token: string | null, extraHeaders:
       return { data: null, refreshedToken: null, status: response.status };
     }
 
+    const isUserHeader = response?.headers?.get("isuser");
+    let isuser = null;
+    if (isUserHeader && isUserHeader !== "false") {
+      try {
+        isuser = JSON.parse(isUserHeader);
+      } catch {
+        isuser = null;
+      }
+    }
+    console.log("isuser from new api call: ", isuser);
+
     const action = data?.action ?? null;
 
     return {
       data,
       action: action,
-      refreshedToken: data?.access_token ?? null,
+      refreshedToken: response?.headers?.get("token") ?? null,
       status: response.status,
+      isuser,
     };
   } catch (error) {
     console.error(`ssrFetch failed for ${path}:`, error);

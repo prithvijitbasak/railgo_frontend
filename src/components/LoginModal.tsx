@@ -15,9 +15,15 @@ import {
   Mail,
   ShieldCheck,
   TramFront,
+  User,
   X,
 } from "lucide-react";
 import { clientFetch } from "@/lib/authFetch";
+import { AuthUser, setCredentials } from "@/redux/slices/authSlice";
+import { getClientTokenCookie, setClientTokenCookie } from "@/lib/authClient";
+import { useAppDispatch } from "@/redux/hooks";
+import { useRouter } from "next/navigation";
+
 
 /**
  * RailGo login modal (email OTP).
@@ -32,24 +38,36 @@ type Props = {
   open: boolean;
   onClose: () => void;
   /** Called with the new JWT after a successful login (e.g. dispatch to Redux + set cookie). */
-  onSuccess?: (token: string) => void;
+  onSuccess?: (
+  token: string,
+  loggedInUser: AuthUser | null
+) => void;
 };
 
 export default function LoginModal({ open, onClose, onSuccess }: Props) {
+  const dispatch = useAppDispatch();
+  const router = useRouter();
   const [step, setStep] = useState<"email" | "otp">("email");
+  const [action, setAction] = useState<"login" | "registration">("login");
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [cooldown, setCooldown] = useState(0);
   const emailRef = useRef<HTMLInputElement>(null);
+  const firstNameRef = useRef<HTMLInputElement>(null);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Reset when closed, lock scroll + Esc to close while open
   useEffect(() => {
     if (!open) {
       setStep("email");
+      setAction("login");
       setEmail("");
+      setFirstName("");
+      setLastName("");
       setOtp(Array(OTP_LENGTH).fill(""));
       setError("");
       setLoading(false);
@@ -78,6 +96,9 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
   if (!open) return null;
 
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const isRegistration = action === "registration";
+  const namesValid =
+    !isRegistration || (firstName.trim() !== "" && lastName.trim() !== "");
 
   async function sendOtp() {
     setError("");
@@ -86,17 +107,25 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
       const formData = new FormData();
       formData.append("email", email);
 
-      const res = await clientFetch(SEND_OTP_URL, {
+      const { ok, data } = await clientFetch(SEND_OTP_URL, {
         method: "POST",
         body: formData,
       });
-      if (!res.ok)
+      if (!ok)
         throw new Error(
           "Could not send the code. Check your email and try again.",
         );
+
+      // Backend tells us whether this email is an existing user or a new one
+      const nextAction =
+        data?.action === "registration" ? "registration" : "login";
+      setAction(nextAction);
       setStep("otp");
       setCooldown(RESEND_SECONDS);
-      setTimeout(() => otpRefs.current[0]?.focus(), 0);
+      setTimeout(() => {
+        if (nextAction === "registration") firstNameRef.current?.focus();
+        else otpRefs.current[0]?.focus();
+      }, 0);
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "Something went wrong. Try again.",
@@ -107,21 +136,44 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
   }
 
   async function verifyOtp(code: string) {
+    if (isRegistration && !namesValid) {
+      setError("Please enter your first and last name.");
+      return;
+    }
     setError("");
     setLoading(true);
     try {
       const formData = new FormData();
       formData.append("email", email);
       formData.append("otp", code);
+      if (isRegistration) {
+        formData.append("firstName", firstName.trim());
+        formData.append("lastName", lastName.trim());
+      }
 
-      const { ok, data } = await clientFetch(VERIFY_OTP_URL, {
+      const { ok, data, headers } = await clientFetch(VERIFY_OTP_URL, {
         method: "POST",
         body: formData,
       });
       if (!ok) throw new Error("That code is incorrect or expired.");
 
-      const token: string = data.token ?? data.accessToken ?? data.access_token;
-      onSuccess?.(token);
+      const token = headers?.get("token") || getClientTokenCookie() || "";
+      const rawUser = headers?.get("isuser");
+      let loggedInUser: AuthUser | null = null;
+      if (rawUser) {
+        try {
+          loggedInUser = JSON.parse(rawUser);
+        } catch {
+          loggedInUser = null;
+        }
+      }
+
+      if (token && loggedInUser) {
+        dispatch(setCredentials({ token, user: loggedInUser }));
+      }
+
+      onSuccess?.(token, loggedInUser);
+      router.refresh();
       onClose();
     } catch (e) {
       setError(
@@ -140,7 +192,7 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
     next[i] = d;
     setOtp(next);
     if (d && i < OTP_LENGTH - 1) otpRefs.current[i + 1]?.focus();
-    if (next.every(Boolean)) verifyOtp(next.join(""));
+    if (next.every(Boolean) && namesValid) verifyOtp(next.join(""));
   }
 
   function onOtpKeyDown(i: number, e: KeyboardEvent<HTMLInputElement>) {
@@ -158,8 +210,9 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
     const next = Array(OTP_LENGTH).fill("");
     pasted.split("").forEach((c, i) => (next[i] = c));
     setOtp(next);
-    if (pasted.length === OTP_LENGTH) verifyOtp(pasted);
-    else otpRefs.current[pasted.length]?.focus();
+    if (pasted.length === OTP_LENGTH) {
+      if (namesValid) verifyOtp(pasted);
+    } else otpRefs.current[pasted.length]?.focus();
   }
 
   return (
@@ -185,7 +238,11 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
             <span className="text-xl font-bold">RailGo</span>
           </div>
           <h2 id="login-title" className="text-2xl font-bold">
-            {step === "email" ? "Log in to book tickets" : "Enter your code"}
+            {step === "email"
+              ? "Log in to book tickets"
+              : isRegistration
+                ? "Create your account"
+                : "Enter your code"}
           </h2>
           <p className="mt-1 text-sm text-blue-100">
             {step === "email"
@@ -240,6 +297,53 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
             </form>
           ) : (
             <div>
+              {/* Only shown when the backend says this email needs registration */}
+              {isRegistration && (
+                <div className="mb-5 grid grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      htmlFor="reg-first-name"
+                      className="mb-1.5 block text-sm font-semibold text-slate-700"
+                    >
+                      First name
+                    </label>
+                    <div className="relative">
+                      <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        ref={firstNameRef}
+                        id="reg-first-name"
+                        type="text"
+                        autoComplete="given-name"
+                        value={firstName}
+                        disabled={loading}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="h-12 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20 disabled:bg-slate-50"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="reg-last-name"
+                      className="mb-1.5 block text-sm font-semibold text-slate-700"
+                    >
+                      Last name
+                    </label>
+                    <div className="relative">
+                      <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        id="reg-last-name"
+                        type="text"
+                        autoComplete="family-name"
+                        value={lastName}
+                        disabled={loading}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="h-12 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20 disabled:bg-slate-50"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div
                 className="flex justify-between gap-2"
                 aria-label="One-time code"
@@ -268,7 +372,7 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
 
               <button
                 onClick={() => verifyOtp(otp.join(""))}
-                disabled={otp.some((d) => !d) || loading}
+                disabled={otp.some((d) => !d) || !namesValid || loading}
                 className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-orange-500 font-semibold text-white transition hover:bg-orange-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
               >
                 {loading ? (
@@ -284,6 +388,9 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
                 <button
                   onClick={() => {
                     setStep("email");
+                    setAction("login");
+                    setFirstName("");
+                    setLastName("");
                     setError("");
                     setOtp(Array(OTP_LENGTH).fill(""));
                   }}
