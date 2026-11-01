@@ -1,8 +1,36 @@
 const SSR_BASE = process.env.SSR_API;
 
-import { getClientTokenCookie, setClientTokenCookie } from "./authClient";
+import {
+  getClientTokenCookie,
+  setClientTokenCookie,
+  removeClientTokenCookie,
+} from "./authClient";
 
 export const FORCED_LOGOUT_FLAG = "force_logout";
+
+export function isForcedLogout(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const d = data as Record<string, unknown>;
+  return (
+    d.action === "forced_logout_device_limit_reached" ||
+    d.enum === "FORCED_LOGOUT_DEVICE_LIMIT_REACHED" ||
+    (typeof d.action === "string" && d.action.startsWith("forced_logout")) ||
+    (typeof d.enum === "string" && d.enum.startsWith("FORCED_LOGOUT"))
+  );
+}
+
+export function handleForcedLogout(message?: string) {
+  if (typeof window === "undefined") return;
+
+  const msg = message || "Your account is logged on another device";
+
+  sessionStorage.setItem("forced_logout_toast", msg);
+  if (window.location.pathname !== "/") {
+    window.location.href = "/";
+  } else {
+    window.location.reload();
+  }
+}
 
 async function parseBody(response: Response) {
   const text = await response.text();
@@ -63,6 +91,13 @@ export async function clientFetch(url: string, options: RequestInit = {}) {
   if (currentTokenValue && existingToken !== currentTokenValue) {
     setClientTokenCookie(currentTokenValue);
     console.log("saved currentToken: ", currentTokenValue);
+  }
+
+  if (isForcedLogout(data)) {
+    if (!currentTokenValue) {
+      removeClientTokenCookie();
+    }
+    handleForcedLogout(data?.message as string | undefined);
   }
 
   return { response, data, ok: response.ok, headers: response?.headers };

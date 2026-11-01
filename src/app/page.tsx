@@ -7,14 +7,13 @@ import { ssrFetch } from "@/lib/authFetch";
 import TokenCookieSyncer from "@/components/TokenCookieSyncer";
 
 export default async function Page() {
-
   const existingToken = await getServerTokenCookie();
   const response = await ssrFetch("/api/public/ssr/home", existingToken);
   const token = response.refreshedToken ?? existingToken ?? null;
   const user = response?.isuser ?? null;
   console.log("from ssr home isuser: ", user);
 
-  console.log("Showing from home ssr",response.data);
+  console.log("Showing from home ssr", response.data);
 
   return (
     <HomeStoreProvider
@@ -24,7 +23,11 @@ export default async function Page() {
         user,
       }}
     >
-      <TokenCookieSyncer token={token} />
+      <TokenCookieSyncer
+        token={token}
+        action={response.action || response.data?.action}
+        message={response.data?.message}
+      />
       <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
         <Header />
         <HomePageContents />

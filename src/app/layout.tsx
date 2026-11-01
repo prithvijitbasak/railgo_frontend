@@ -36,7 +36,16 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         <StoreProvider>
           {children}
-          <Toaster richColors position="top-right" />
+          <Toaster
+            richColors
+            position="top-right"
+            closeButton
+            toastOptions={{
+              classNames: {
+                closeButton: "!left-auto !right-0 !translate-x-[35%]",
+              },
+            }}
+          />
         </StoreProvider>
       </body>
     </html>

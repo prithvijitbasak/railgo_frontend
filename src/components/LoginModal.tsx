@@ -19,7 +19,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { clientFetch } from "@/lib/authFetch";
+import { clientFetch, isForcedLogout } from "@/lib/authFetch";
 import { AuthUser, setCredentials } from "@/redux/slices/authSlice";
 import { getClientTokenCookie } from "@/lib/authClient";
 import { useAppDispatch } from "@/redux/hooks";
@@ -115,7 +115,8 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
       });
       if (!ok)
         throw new Error(
-          "Could not send the code. Check your email and try again."
+          data?.message ||
+            "Could not send the code. Check your email and try again."
         );
 
       // Backend tells us whether this email is an existing user or a new one
@@ -124,6 +125,9 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
       setAction(nextAction);
       setStep("otp");
       setCooldown(RESEND_SECONDS);
+      if (data?.message && !isForcedLogout(data)) {
+        toast.success(data.message);
+      }
       setTimeout(() => {
         if (nextAction === "registration") firstNameRef.current?.focus();
         else otpRefs.current[0]?.focus();
@@ -153,11 +157,14 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
         formData.append("lastName", lastName.trim());
       }
 
-      const { ok, headers } = await clientFetch(VERIFY_OTP_URL, {
+      const { ok, data, headers } = await clientFetch(VERIFY_OTP_URL, {
         method: "POST",
         body: formData,
       });
-      if (!ok) throw new Error("That code is incorrect or expired.");
+      if (!ok)
+        throw new Error(
+          data?.message || "That code is incorrect or expired."
+        );
 
       const token = headers?.get("token") || getClientTokenCookie() || "";
       const rawUser = headers?.get("isuser");
@@ -174,11 +181,9 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
         dispatch(setCredentials({ token, user: loggedInUser }));
       }
 
-      toast.success(
-        loggedInUser?.first_name
-          ? `Logged in successfully! Welcome, ${loggedInUser.first_name}.`
-          : "Logged in successfully!"
-      );
+      if (data?.message && !isForcedLogout(data)) {
+        toast.success(data.message);
+      }
 
       onSuccess?.(token, loggedInUser);
       router.refresh();
