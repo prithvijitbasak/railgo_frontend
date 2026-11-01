@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -20,10 +21,10 @@ import {
 } from "lucide-react";
 import { clientFetch } from "@/lib/authFetch";
 import { AuthUser, setCredentials } from "@/redux/slices/authSlice";
-import { getClientTokenCookie, setClientTokenCookie } from "@/lib/authClient";
+import { getClientTokenCookie } from "@/lib/authClient";
 import { useAppDispatch } from "@/redux/hooks";
 import { useRouter } from "next/navigation";
-
+import { toast } from "sonner";
 
 /**
  * RailGo login modal (email OTP).
@@ -38,10 +39,7 @@ type Props = {
   open: boolean;
   onClose: () => void;
   /** Called with the new JWT after a successful login (e.g. dispatch to Redux + set cookie). */
-  onSuccess?: (
-  token: string,
-  loggedInUser: AuthUser | null
-) => void;
+  onSuccess?: (token: string, loggedInUser: AuthUser | null) => void;
 };
 
 export default function LoginModal({ open, onClose, onSuccess }: Props) {
@@ -60,31 +58,35 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
   const firstNameRef = useRef<HTMLInputElement>(null);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Reset when closed, lock scroll + Esc to close while open
+  const handleClose = useCallback(() => {
+    setStep("email");
+    setAction("login");
+    setEmail("");
+    setFirstName("");
+    setLastName("");
+    setOtp(Array(OTP_LENGTH).fill(""));
+    setError("");
+    setLoading(false);
+    setCooldown(0);
+    onClose();
+  }, [onClose]);
+
+  // Lock scroll + Esc to close while open
   useEffect(() => {
-    if (!open) {
-      setStep("email");
-      setAction("login");
-      setEmail("");
-      setFirstName("");
-      setLastName("");
-      setOtp(Array(OTP_LENGTH).fill(""));
-      setError("");
-      setLoading(false);
-      setCooldown(0);
-      return;
-    }
+    if (!open) return;
+
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKey = (e: globalThis.KeyboardEvent) =>
-      e.key === "Escape" && onClose();
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+    };
     window.addEventListener("keydown", onKey);
     emailRef.current?.focus();
     return () => {
       document.body.style.overflow = prev;
       window.removeEventListener("keydown", onKey);
     };
-  }, [open, onClose]);
+  }, [open, handleClose]);
 
   // Resend countdown
   useEffect(() => {
@@ -113,7 +115,7 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
       });
       if (!ok)
         throw new Error(
-          "Could not send the code. Check your email and try again.",
+          "Could not send the code. Check your email and try again."
         );
 
       // Backend tells us whether this email is an existing user or a new one
@@ -128,7 +130,7 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
       }, 0);
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Something went wrong. Try again.",
+        e instanceof Error ? e.message : "Something went wrong. Try again."
       );
     } finally {
       setLoading(false);
@@ -151,7 +153,7 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
         formData.append("lastName", lastName.trim());
       }
 
-      const { ok, data, headers } = await clientFetch(VERIFY_OTP_URL, {
+      const { ok, headers } = await clientFetch(VERIFY_OTP_URL, {
         method: "POST",
         body: formData,
       });
@@ -172,12 +174,18 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
         dispatch(setCredentials({ token, user: loggedInUser }));
       }
 
+      toast.success(
+        loggedInUser?.first_name
+          ? `Logged in successfully! Welcome, ${loggedInUser.first_name}.`
+          : "Logged in successfully!"
+      );
+
       onSuccess?.(token, loggedInUser);
       router.refresh();
-      onClose();
+      handleClose();
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "Something went wrong. Try again.",
+        e instanceof Error ? e.message : "Something went wrong. Try again."
       );
       setOtp(Array(OTP_LENGTH).fill(""));
       otpRefs.current[0]?.focus();
@@ -218,7 +226,7 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      onMouseDown={(e) => e.target === e.currentTarget && handleClose()}
       role="dialog"
       aria-modal="true"
       aria-labelledby="login-title"
@@ -227,7 +235,7 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
         {/* Blue header, same as the site hero */}
         <div className="bg-blue-600 px-8 pb-8 pt-7 text-white">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close"
             className="absolute cursor-pointer right-4 top-4 rounded-lg p-1.5 text-white/80 transition hover:bg-white/15 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
@@ -241,8 +249,8 @@ export default function LoginModal({ open, onClose, onSuccess }: Props) {
             {step === "email"
               ? "Log in to book tickets"
               : isRegistration
-                ? "Create your account"
-                : "Enter your code"}
+              ? "Create your account"
+              : "Enter your code"}
           </h2>
           <p className="mt-1 text-sm text-blue-100">
             {step === "email"

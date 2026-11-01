@@ -11,3 +11,7 @@ export async function getServerTokenCookie() {
 export async function setServerTokenCookie(token: string) {
   (await cookies()).set("token", token, { maxAge: MAX_AGE });
 }
+
+export async function deleteServerTokenCookie() {
+  (await cookies()).delete("token");
+}

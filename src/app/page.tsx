@@ -5,7 +5,6 @@ import Footer from "@/components/Footer";
 import { getServerTokenCookie } from "@/lib/authServer";
 import { ssrFetch } from "@/lib/authFetch";
 import TokenCookieSyncer from "@/components/TokenCookieSyncer";
-import { headers } from "next/headers";
 
 export default async function Page() {
 

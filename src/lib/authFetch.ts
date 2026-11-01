@@ -1,17 +1,8 @@
-const CLIENT_BASE = process.env.NEXT_PUBLIC_CLIENT_API;
 const SSR_BASE = process.env.SSR_API;
 
 import { getClientTokenCookie, setClientTokenCookie } from "./authClient";
 
 export const FORCED_LOGOUT_FLAG = "force_logout";
-
-// export function forceLogout() {
-//   if (typeof window !== "undefined") {
-//     window.name = FORCED_LOGOUT_FLAG;
-//     const locale = localeFromPathname(window.location.pathname);
-//     window.location.href = getAppLocaleHref(locale, "/");
-//   }
-// }
 
 async function parseBody(response: Response) {
   const text = await response.text();
@@ -29,7 +20,6 @@ export function handleAuthAction(
   options: { currentToken?: string | null } = {}
 ) {
   const { currentToken = null } = options;
-  const action = data?.action;
   
   const headerToken =
     typeof response?.headers?.get === "function" 
@@ -42,7 +32,6 @@ export function handleAuthAction(
     setClientTokenCookie(newToken);
   }
 }
-
 
 export async function clientFetch(url: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers);
@@ -70,12 +59,11 @@ export async function clientFetch(url: string, options: RequestInit = {}) {
   console.log("new token is: ", currentTokenValue);
 
   const data = await response.json().catch(() => null);
-  const existingToken=getClientTokenCookie();
-  if(currentTokenValue && existingToken !== currentTokenValue){
+  const existingToken = getClientTokenCookie();
+  if (currentTokenValue && existingToken !== currentTokenValue) {
     setClientTokenCookie(currentTokenValue);
     console.log("saved currentToken: ", currentTokenValue);
   }
-  // handleAuthAction(data, response, { currentToken: currentTokenValue });
 
   return { response, data, ok: response.ok, headers: response?.headers };
 }

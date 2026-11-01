@@ -1,7 +1,6 @@
-// src/redux/HomeStoreProvider.tsx
 "use client";
 
-import { useRef, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Provider } from "react-redux";
 import { makeStore, type AppStore } from "./store";
 import { initialAuthState, type AuthState } from "./slices/authSlice";
@@ -25,17 +24,15 @@ const HomeStoreProvider = ({
   const dispatch = useAppDispatch();
   const router = useRouter();
   const open = useAppSelector((state) => state.ui.loginModalOpen);
-  const storeRef = useRef<AppStore | null>(null);
-
-  if (!storeRef.current) {
-    storeRef.current = makeStore({
+  const [store] = useState<AppStore>(() =>
+    makeStore({
       auth: { ...initialAuthState, ...authState },
       ui: { ...initialUiState, loginModalOpen: openLoginModal },
-    });
-  }
+    })
+  );
 
   return (
-    <Provider store={storeRef.current}>
+    <Provider store={store}>
       {children}
       <LoginModal
         open={open}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Train, Filter, ArrowRight, Clock, Sun, Moon, Sunrise, Sunset, ChevronDown } from 'lucide-react';
+import { Train, Filter, ArrowRight, Clock, Sun, Moon, Sunrise, Sunset } from 'lucide-react';
 
 // Mock Data for Search Results
 const mockTrains = [
